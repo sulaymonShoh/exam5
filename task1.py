@@ -1,46 +1,50 @@
 import os
+import time
+
 import httpx
+from contextlib import contextmanager
 
 
-# class FileManager:
-#     def __init__(self, path, mode):
-#         self.path = path
-#         self.mode = mode
-#
-#     def __enter__(self):
-#         file = open(self.path, self.mode)
-#         self.file = file
-#         return self.file
-#
-#     def __exit__(self):
-#         self.file.close()
+@contextmanager
+def file_manager(filename, mode='r'):
+    file = open(filename, mode)
 
-class ContextManager:
-    def __init__(self, path, mode):
-        self.path = path
-        self.mode = mode
+    try:
+        yield file
+    finally:
+        file.close()
 
-    def __enter__(self):
-        file = open(self.path, self.mode)
-        self.file = file
-        return file
 
-    def __exit__(self):
-        self.file.close()
+def send_request(url, data):
+    with httpx.Client() as client:
+        response = client.post(url, json=data)
+        print("Sending request ...")
+        return response.status_code
+
+
+def get_data_from_file(filename):
+    with file_manager(filename, 'r') as fin:
+        print(f"getting data from {filename}")
+        data = fin.read().splitlines()
+        json_data = {
+            "name": data[0],
+            "price": data[1],
+            "description": data[2],
+        }
+        return json_data
 
 
 if __name__ == '__main__':
+    t1 = time.time()
+    url = "http://164.92.64.76/desc"
     files = os.listdir('descriptions')
-    os.chdir("descriptions")
-    print(files)
-
-    for file in files:
-        with ContextManager(file, 'r') as fin:
-            data = fin.readlines()
-            print(data)
-            # json_data = {
-                # "name":
-            # }
-
-            # with httpx.Client() as client:
-            #     response = client.post('http://164.92.64.76/desc/', )
+    for i in files:
+        os.chdir("descriptions")
+        data = get_data_from_file(i)
+        response = send_request(url, data)
+        os.chdir("..")
+        with open('responses.txt', 'a') as fout:
+            print("writing response to log file")
+            fout.write(f"{i} - {response}\n")
+    t2=time.time()
+    print(f"Done in {round(t2-t1, 2)} seconds")
